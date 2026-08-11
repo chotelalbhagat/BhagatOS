@@ -1,0 +1,17 @@
+# Build output
+build/*.bin
+build/*.img
+build/*.vdi
+build/*.iso
+
+# VirtualBox
+*.vdi
+*.vbox
+*.vbox-prev
+
+# VS Code
+.vscode/
+
+# Temporary files
+*.tmp
+*.log
