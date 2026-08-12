@@ -15,6 +15,23 @@ start:
     mov si, msg_stage2
     call print16
 
+    ; ==================================================
+    ; Load Kernel using BIOS INT 13h Extensions
+    ; ==================================================
+
+    mov si, msg_kernel_loading
+    call print16
+
+    mov si, kernel_dap
+    mov ah, 0x42
+    mov dl, [0x0FF0]
+
+    int 0x13
+
+    jc kernel_disk_error
+
+    mov si, msg_kernel_loaded
+    call print16
 
     ; ==================================================
     ; Enable A20
@@ -24,13 +41,11 @@ start:
     or al, 00000010b
     out 0x92, al
 
-
     ; ==================================================
     ; Load GDT
     ; ==================================================
 
     lgdt [gdt_descriptor]
-
 
     ; ==================================================
     ; Enter Protected Mode
@@ -41,6 +56,30 @@ start:
     mov cr0, eax
 
     jmp 0x08:protected_mode
+
+
+kernel_disk_error:
+
+    mov si, msg_kernel_error
+    call print16
+
+.kernel_hang:
+    cli
+    hlt
+    jmp .kernel_hang
+
+
+kernel_dap:
+
+    db 0x10
+    db 0x00
+
+    dw 1
+
+    dw 0x8000
+    dw 0x0000
+
+    dq 34
 
 
 ; ======================================================
@@ -300,7 +339,7 @@ bits 64
 long_mode:
 
     ; --------------------------------------------------
-    ; Load 64-bit data segment
+    ; Load 64-bit data segments
     ; --------------------------------------------------
 
     mov ax, 0x20
@@ -311,7 +350,7 @@ long_mode:
 
 
     ; --------------------------------------------------
-    ; Setup stack
+    ; Set stack
     ; --------------------------------------------------
 
     mov rsp, 0x90000
@@ -321,9 +360,8 @@ long_mode:
     ; Print Long Mode message
     ; --------------------------------------------------
 
-    mov rdi, 0xB8000 + 320
+    mov rdi, 0xB8000
     mov rsi, msg_long_mode
-
 
 .print64:
 
@@ -331,7 +369,7 @@ long_mode:
 
     test al, al
 
-    jz .done64
+    jz .copy_kernel
 
     mov ah, 0x0F
 
@@ -342,14 +380,61 @@ long_mode:
     jmp .print64
 
 
-.done64:
+    ; --------------------------------------------------
+    ; Copy kernel
+    ;
+    ; Kernel was loaded at 0x8000
+    ; Kernel is linked at 0x100000
+    ;
+    ; kernel.bin = 177 bytes
+    ; --------------------------------------------------
 
-    cli
+.copy_kernel:
+
+    mov rsi, 0x8000
+    mov rdi, 0x100000
+    mov rcx, 177
+
+    rep movsb
+
+    ; --------------------------------------------------
+    ; Kernel copied successfully
+    ; --------------------------------------------------
+
+    mov rdi, 0xB8000 + 160
+    mov rsi, msg_kernel_copied
+
+
+.print_kernel_copied:
+
+    lodsb
+    test al, al
+    jz .kernel_start
+
+    mov ah, 0x0F
+    mov [rdi], ax
+    add rdi, 2
+
+    jmp .print_kernel_copied
+
+
+    ; --------------------------------------------------
+    ; Start 64-bit kernel
+    ; --------------------------------------------------
+
+    .kernel_start:
+
+    jmp 0x100020
+
+
+    ; --------------------------------------------------
+    ; Should never reach here
+    ; --------------------------------------------------
 
 .hang:
 
+    cli
     hlt
-
     jmp .hang
 
 
@@ -459,6 +544,23 @@ msg_stage2:
 
     db 'Stage 2 loaded successfully!', 0
 
+
+msg_kernel_loading:
+
+    db ' Loading kernel...', 0
+
+msg_kernel_loaded:
+
+    db ' Kernel loaded!', 0
+
+msg_kernel_error:
+
+    db ' Kernel disk read error!', 0
+
+
+msg_kernel_copied:
+
+    db 'KERNEL COPIED TO 0x100000 OK!', 0
 
 msg_protected:
 

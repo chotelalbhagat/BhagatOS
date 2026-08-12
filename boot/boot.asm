@@ -7,13 +7,14 @@ start:
     xor ax, ax
     mov ds, ax
     mov es, ax
+
     mov ss, ax
     mov sp, 0x7C00
 
-    sti
-
     ; Save BIOS boot drive
     mov [boot_drive], dl
+
+    sti
 
     ; --------------------------------------------------
     ; Show loading message
@@ -44,7 +45,7 @@ start:
     ; Load Stage 2 using LBA
     ;
     ; Stage 2 begins at LBA 1
-    ; Load 33 sectors
+    ; Load 32 sectors
     ;
     ; Destination:
     ; 0000:1000
@@ -66,6 +67,10 @@ start:
 
     mov si, loaded_message
     call print_string
+
+    ; Pass BIOS boot drive to Stage 2
+    mov dl, [boot_drive]
+    mov [0x0FF0], dl
 
     jmp 0x0000:0x1000
 
